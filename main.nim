@@ -56,13 +56,7 @@ proc displayTitleScreen(): string =
     var
         bb = newBoxBuffer(terminalWidth(), terminalHeight())
         name: seq[char] 
-        finalname: string
         done = false
-        keys = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","X","Y","Z"]
-        shiftkeys: array[keys.len, string]
-
-    for i in 0..<keys.len():
-        shiftkeys[i] = "Shift" & keys[i]
 
     tb.setForegroundColor(fgYellow)
     clearTerminal(int(width/4)+4,int(height/4)+2,int(width/4*3)+4,int(height/4*3)+2)
@@ -73,19 +67,20 @@ proc displayTitleScreen(): string =
         var 
             key = getKey()
             tempstr: string
-        if ($key in keys or $key in shiftkeys) and name.len < 15:
-            var str = $key # Have to define this, it doesn't like to do $key[$key.len-1]
-            name.add(str[str.len-1])
-        elif key == Key.Backspace and name.len > 0:
+        case key
+        of Key.Backspace: 
+          if name.len > 0:
             discard name.pop()
-        elif key == Key.Enter:
+        of Key.Enter:
             done = true
+        of Key.None:
+          discard
+        else:
+          if name.len < 16:
+            name.add key.char
     
         for i in 0..<name.len:
-            if i == 0:
-                tempstr = $name[i]
-            else:
-                tempstr = tempstr & $toLowerAscii(name[i])
+            tempstr.add $name[i]
     
         clearTerminal(int(width/2 - 10)+4, int(height/4 + 7)+2, int(width/2 + 10)+4, int(height/4 + 7)+2)
         tb.setForegroundColor(fgWhite)
@@ -93,9 +88,8 @@ proc displayTitleScreen(): string =
         tb.setForegroundColor(fgYellow)
         tb.write(bb)
         tb.display()
-        finalname = tempstr
+        result = tempstr
     clearTerminal(0,0,terminalWidth(),terminalHeight())
-    return finalname
 
 
 worldArr[0] = worldOriginal
@@ -148,7 +142,10 @@ proc drawInitialTerminal() = # Thanks Goat
     var n = 0
     for line in "ui.txt".linesInFile:
     # This makes sure $hp, $mp and $lv don't literally show up in the UI.
-        tb.write(0, n, line.multiReplace({"$h": "  ", "$m": "  ", "$f": "  ", "$t": "  ", "$l": "  ", "$e": "  ", "$w": "  ", "$a": "  ", "$s": "  ", "$1": "  ", "$2": "  ", "$3": "  ", "$4": "  "}))
+        tb.write(0, n, line.multiReplace(
+        {"$h": "  ", "$m": "  ", "$f": "  ", "$t": "  ", 
+         "$l": "  ", "$e": "  ", "$w": "  ", "$a": "  ", 
+         "$s": "  ", "$1": "  ", "$2": "  ", "$3": "  ", "$4": "  "}))
         inc n
 
     # Too manual, maybe there's a fix but it works for now
@@ -166,46 +163,26 @@ proc drawInitialTerminal() = # Thanks Goat
     tb.write(3,7, "~EQUIPMENT~")
     tb.write(7, 12, "─~─")
 
+proc replaceStat(l:string,c: ForegroundColor, pattern, stat: string, n:int, bright: bool = false) =
+        if l.contains(pattern):
+            tb.setForegroundColor(fgRed, bright)
+            let x = getLineX(l, pattern) # This is super unoptimized, is there a way to deal with this? Enum maybe?
+            clearTerminal(x,n,x+1,n) # This too 
+            tb.write(x,n,$player.hp)
+
 proc drawToTerminal() = 
     var n =0
     for line in "ui.txt".linesInFile:
       # The empty space created earlier gets filled.
       # But we are still passing manual x coordinates to do that...
       # which isn't ideal.
-        if line.contains("$h"):
-            tb.setForegroundColor(fgRed)
-            let x = getLineX(line, "$h") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too 
-            tb.write(x,n,$player.hp)
-        if line.contains("$m"):
-            tb.setForegroundColor(fgBlue, bright=true)
-            let x = getLineX(line, "$m") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,$player.mp)
-        if line.contains("$l"):
-            tb.setForegroundColor(fgYellow, bright=true)
-            let x = getLineX(line, "$l") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,$player.lvl)
-        if line.contains("$f"):
-            tb.setForegroundColor(fgGreen)
-            let x = getLineX(line, "$f") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,$level)
-        if line.contains("$t"):
-            tb.setForegroundColor(fgYellow)
-            let x = getLineX(line, "$t") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,lastAction)
-        tb.setForegroundColor(fgYellow)
-        if line.contains("$w"):
-            let x = getLineX(line, "$w") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,player.inventory[0].name)
-        if line.contains("$a"):
-            let x = getLineX(line, "$a") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,player.inventory[1].name)
+        line.replaceStat(fgRed,     "$h", $player.hp, n)
+        line.replaceStat(fgBlue,    "$m", $player.mp, n, true)
+        line.replaceStat(fgYellow,  "$l", $player.lvl, n, true)
+        line.replaceStat(fgGreen,   "$f", $level, n)
+        line.replaceStat(fgYellow,  "$t", lastAction, n)
+        line.replaceStat(fgYellow,  "$w", player.inventory[0].name, n)
+        line.replaceStat(fgYellow,  "$a", player.inventory[1].name, n)
         if line.contains("$e"):
             let x = getLineX(line, "$e") # This is super unoptimized, is there a way to deal with this? Enum maybe?
             if lastEnemy.name != "":
