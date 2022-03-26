@@ -76,7 +76,7 @@ proc displayTitleScreen(): string =
         of Key.None:
           discard
         else:
-          if name.len < 16:
+          if name.len <= 15:
             name.add key.char
     
         for i in 0..<name.len:
@@ -165,7 +165,7 @@ proc drawInitialTerminal() = # Thanks Goat
 
 proc replaceStat(l:string,c: ForegroundColor, pattern, stat: string, n:int, bright: bool = false) =
         if l.contains(pattern):
-            tb.setForegroundColor(fgRed, bright)
+            tb.setForegroundColor(c, bright)
             let x = getLineX(l, pattern) # This is super unoptimized, is there a way to deal with this? Enum maybe?
             clearTerminal(x,n,x+1,n) # This too 
             tb.write(x,n,$player.hp)
