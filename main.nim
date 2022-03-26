@@ -168,7 +168,7 @@ proc replaceStat(l:string,c: ForegroundColor, pattern, stat: string, n:int, brig
             tb.setForegroundColor(c, bright)
             let x = getLineX(l, pattern) # This is super unoptimized, is there a way to deal with this? Enum maybe?
             clearTerminal(x,n,x+1,n) # This too 
-            tb.write(x,n,$player.hp)
+            tb.write(x,n,stat)
 
 proc drawToTerminal() = 
     var n =0
