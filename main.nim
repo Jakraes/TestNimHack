@@ -1,5 +1,6 @@
 import std/[os, math, times, strutils, random]
 import hacktypes, entities, generator
+from sound import play
 import illwill 
 #--------------------------------\\--------------------------------#
 
@@ -15,7 +16,7 @@ var
     worldOriginal = loadWorldFile "shop.txt"
     currentWorld = worldOriginal
     world = worldOriginal
-    player = Player(name: "player", species: '@', att: 3, def: 3, acc: 10, hp: 10, mp: 10)
+    player = Player(species: '@', att: 3, def: 3, acc: 10, hp: 10, mp: 10)
     playerMoved = false # Gotta add this because the player is attacking enemies without input, check dealCollision proc
     lastAction: string
     lastEnemy = Entity(name: "")
@@ -32,17 +33,18 @@ proc clearTerminal(x1,y1,x2,y2: int) = # Clears a rectangular area of the termin
         for x in x1..x2:
             tb.write(x,y," ")
 
-proc displayTitleScreen(): string =
+proc displayTitleScreen() =
     var n: int
-    tb.setForegroundColor(fgYellow)
-    var llen: int
-    for l in "title.txt".linesInFile:
-        tb.write(0,n,l)
-        inc n
-        llen = l.len
-    tb.drawRect(0,0,llen,7)
-    n += 1
-    for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
+    {.cast(gcsafe).}:
+      tb.setForegroundColor(fgYellow)
+      var llen: int
+      for l in "title.txt".linesInFile:
+          tb.write(0,n,l)
+          inc n
+          llen = l.len
+      tb.drawRect(0,0,llen,7)
+      n += 1
+      for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
         tb.setForegroundColor(color, isBright)
         var nn = n
         for l in "splash.txt".linesInFile:
@@ -50,42 +52,36 @@ proc displayTitleScreen(): string =
             inc nn
         tb.display()
         sleep(0500)
-    sleep(1000)
-
+      sleep(1000)
     # THE SPAGHETTI CODE STARTS HERE; The code is a bit ugly so it needs to be cleaned up a little idk how
-    var
+      var
         bb = newBoxBuffer(terminalWidth(), terminalHeight())
         name: seq[char] 
-        finalname: string
         done = false
-        keys = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","X","Y","Z"]
-        shiftkeys: array[keys.len, string]
 
-    for i in 0..<keys.len():
-        shiftkeys[i] = "Shift" & keys[i]
-
-    tb.setForegroundColor(fgYellow)
-    clearTerminal(int(width/4)+4,int(height/4)+2,int(width/4*3)+4,int(height/4*3)+2)
-    bb.drawRect(int(width/4)+4, int(height/4)+2, int(width/4*3)+4, int(height/4*3)+2, doubleStyle=true)
-    tb.write(int(width/2) - int("~Welcome to NimHack!~".len/2)+4, int(height/4 + 2)+2, "~Welcome to NimHack!~")
-    tb.write(int(width/2) - int("What is your name?".len/2)+4, int(height/4 + 5)+2, "What is your name?")
-    while not done:
+      tb.setForegroundColor(fgYellow)
+      clearTerminal(int(width/4)+4,int(height/4)+2,int(width/4*3)+4,int(height/4*3)+2)
+      bb.drawRect(int(width/4)+4, int(height/4)+2, int(width/4*3)+4, int(height/4*3)+2, doubleStyle=true)
+      tb.write(int(width/2) - int("~Welcome to NimHack!~".len/2)+4, int(height/4 + 2)+2, "~Welcome to NimHack!~")
+      tb.write(int(width/2) - int("What is your name?".len/2)+4, int(height/4 + 5)+2, "What is your name?")
+      while not done:
         var 
             key = getKey()
             tempstr: string
-        if ($key in keys or $key in shiftkeys) and name.len < 15:
-            var str = $key # Have to define this, it doesn't like to do $key[$key.len-1]
-            name.add(str[str.len-1])
-        elif key == Key.Backspace and name.len > 0:
+        case key
+        of Key.Backspace: 
+          if name.len > 0:
             discard name.pop()
-        elif key == Key.Enter:
+        of Key.Enter:
             done = true
+        of Key.None:
+          discard
+        else:
+          if name.len <= 15:
+            name.add key.char
     
         for i in 0..<name.len:
-            if i == 0:
-                tempstr = $name[i]
-            else:
-                tempstr = tempstr & $toLowerAscii(name[i])
+            tempstr.add $name[i]
     
         clearTerminal(int(width/2 - 10)+4, int(height/4 + 7)+2, int(width/2 + 10)+4, int(height/4 + 7)+2)
         tb.setForegroundColor(fgWhite)
@@ -93,9 +89,8 @@ proc displayTitleScreen(): string =
         tb.setForegroundColor(fgYellow)
         tb.write(bb)
         tb.display()
-        finalname = tempstr
-    clearTerminal(0,0,terminalWidth(),terminalHeight())
-    return finalname
+        player.name = tempstr
+      clearTerminal(0,0,terminalWidth(),terminalHeight())
 
 
 worldArr[0] = worldOriginal
@@ -148,7 +143,10 @@ proc drawInitialTerminal() = # Thanks Goat
     var n = 0
     for line in "ui.txt".linesInFile:
     # This makes sure $hp, $mp and $lv don't literally show up in the UI.
-        tb.write(0, n, line.multiReplace({"$h": "  ", "$m": "  ", "$f": "  ", "$t": "  ", "$l": "  ", "$e": "  ", "$w": "  ", "$a": "  ", "$s": "  ", "$1": "  ", "$2": "  ", "$3": "  ", "$4": "  "}))
+        tb.write(0, n, line.multiReplace(
+        {"$h": "  ", "$m": "  ", "$f": "  ", "$t": "  ", 
+         "$l": "  ", "$e": "  ", "$w": "  ", "$a": "  ", 
+         "$s": "  ", "$1": "  ", "$2": "  ", "$3": "  ", "$4": "  "}))
         inc n
 
     # Too manual, maybe there's a fix but it works for now
@@ -166,46 +164,26 @@ proc drawInitialTerminal() = # Thanks Goat
     tb.write(3,7, "~EQUIPMENT~")
     tb.write(7, 12, "─~─")
 
+proc replaceStat(l:string,c: ForegroundColor, pattern, stat: string, n:int, bright: bool = false) =
+        if l.contains(pattern):
+            tb.setForegroundColor(c, bright)
+            let x = getLineX(l, pattern) # This is super unoptimized, is there a way to deal with this? Enum maybe?
+            clearTerminal(x,n,x+1,n) # This too 
+            tb.write(x,n,stat)
+
 proc drawToTerminal() = 
     var n =0
     for line in "ui.txt".linesInFile:
       # The empty space created earlier gets filled.
       # But we are still passing manual x coordinates to do that...
       # which isn't ideal.
-        if line.contains("$h"):
-            tb.setForegroundColor(fgRed)
-            let x = getLineX(line, "$h") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too 
-            tb.write(x,n,$player.hp)
-        if line.contains("$m"):
-            tb.setForegroundColor(fgBlue, bright=true)
-            let x = getLineX(line, "$m") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,$player.mp)
-        if line.contains("$l"):
-            tb.setForegroundColor(fgYellow, bright=true)
-            let x = getLineX(line, "$l") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,$player.lvl)
-        if line.contains("$f"):
-            tb.setForegroundColor(fgGreen)
-            let x = getLineX(line, "$f") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,$level)
-        if line.contains("$t"):
-            tb.setForegroundColor(fgYellow)
-            let x = getLineX(line, "$t") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,lastAction)
-        tb.setForegroundColor(fgYellow)
-        if line.contains("$w"):
-            let x = getLineX(line, "$w") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,player.inventory[0].name)
-        if line.contains("$a"):
-            let x = getLineX(line, "$a") # This is super unoptimized, is there a way to deal with this? Enum maybe?
-            clearTerminal(x,n,x+1,n) # This too
-            tb.write(x,n,player.inventory[1].name)
+        line.replaceStat(fgRed,     "$h", $player.hp, n)
+        line.replaceStat(fgBlue,    "$m", $player.mp, n, true)
+        line.replaceStat(fgYellow,  "$l", $player.lvl, n, true)
+        line.replaceStat(fgGreen,   "$f", $level, n)
+        line.replaceStat(fgYellow,  "$t", lastAction, n)
+        line.replaceStat(fgYellow,  "$w", player.inventory[0].name, n)
+        line.replaceStat(fgYellow,  "$a", player.inventory[1].name, n)
         if line.contains("$e"):
             let x = getLineX(line, "$e") # This is super unoptimized, is there a way to deal with this? Enum maybe?
             if lastEnemy.name != "":
@@ -433,10 +411,17 @@ proc exitProc() {.noconv.} =
     showCursor()
     quit(0)
 
+proc playMainTheme() {.thread.} =
+    let main_theme: string = "nimrod.mp3"
+    discard play(main_theme, 22000)
+
 proc main() =
     illwillInit(fullscreen=true)
     hideCursor()
-    player.name = displayTitleScreen()
+    var thread: array[2,Thread[void]]
+    createThread[void](thread[0], playMainTheme)
+    joinThreads(thread)
+    displayTitleScreen()
     drawInitialTerminal()
     setControlCHook(exitProc)
 
