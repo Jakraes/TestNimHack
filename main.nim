@@ -1,5 +1,6 @@
 import std/[os, math, times, strutils, random]
 import hacktypes, entities, generator
+from sound import play
 import illwill 
 #--------------------------------\\--------------------------------#
 
@@ -15,7 +16,7 @@ var
     worldOriginal = loadWorldFile "shop.txt"
     currentWorld = worldOriginal
     world = worldOriginal
-    player = Player(name: "player", species: '@', att: 3, def: 3, acc: 10, hp: 10, mp: 10)
+    player = Player(species: '@', att: 3, def: 3, acc: 10, hp: 10, mp: 10)
     playerMoved = false # Gotta add this because the player is attacking enemies without input, check dealCollision proc
     lastAction: string
     lastEnemy = Entity(name: "")
@@ -32,7 +33,7 @@ proc clearTerminal(x1,y1,x2,y2: int) = # Clears a rectangular area of the termin
         for x in x1..x2:
             tb.write(x,y," ")
 
-proc displayTitleScreen(): string =
+proc displayTitleScreen() =
     var n: int
     tb.setForegroundColor(fgYellow)
     var llen: int
@@ -43,20 +44,19 @@ proc displayTitleScreen(): string =
     tb.drawRect(0,0,llen,7)
     n += 1
     for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
-        tb.setForegroundColor(color, isBright)
-        var nn = n
-        for l in "splash.txt".linesInFile:
-            tb.write(0,nn,l)
-            inc nn
-        tb.display()
-        sleep(0500)
+      tb.setForegroundColor(color, isBright)
+      var nn = n
+      for l in "splash.txt".linesInFile:
+          tb.write(0,nn,l)
+          inc nn
+      tb.display()
+      sleep(0500)
     sleep(1000)
-
     # THE SPAGHETTI CODE STARTS HERE; The code is a bit ugly so it needs to be cleaned up a little idk how
     var
-        bb = newBoxBuffer(terminalWidth(), terminalHeight())
-        name: seq[char] 
-        done = false
+      bb = newBoxBuffer(terminalWidth(), terminalHeight())
+      name: seq[char] 
+      done = false
 
     tb.setForegroundColor(fgYellow)
     clearTerminal(int(width/4)+4,int(height/4)+2,int(width/4*3)+4,int(height/4*3)+2)
@@ -64,31 +64,32 @@ proc displayTitleScreen(): string =
     tb.write(int(width/2) - int("~Welcome to NimHack!~".len/2)+4, int(height/4 + 2)+2, "~Welcome to NimHack!~")
     tb.write(int(width/2) - int("What is your name?".len/2)+4, int(height/4 + 5)+2, "What is your name?")
     while not done:
-        var 
-            key = getKey()
-            tempstr: string
-        case key
-        of Key.Backspace: 
-          if name.len > 0:
-            discard name.pop()
-        of Key.Enter:
-            done = true
-        of Key.None:
-          discard
-        else:
-          if name.len <= 15:
-            name.add key.char
+
+      var 
+          key = getKey()
+          tempstr: string
+      case key
+      of Key.Backspace: 
+        if name.len > 0:
+          discard name.pop()
+      of Key.Enter:
+        done = true
+      of Key.None:
+        discard
+      else:
+        if name.len <= 15:
+          name.add key.char
     
-        for i in 0..<name.len:
-            tempstr.add $name[i]
+      for i in 0..<name.len:
+          tempstr.add $name[i]
     
-        clearTerminal(int(width/2 - 10)+4, int(height/4 + 7)+2, int(width/2 + 10)+4, int(height/4 + 7)+2)
-        tb.setForegroundColor(fgWhite)
-        tb.write(int(width/2 - tempstr.len/2)+4, int(height/4 + 7)+2, tempstr)
-        tb.setForegroundColor(fgYellow)
-        tb.write(bb)
-        tb.display()
-        result = tempstr
+      clearTerminal(int(width/2 - 10)+4, int(height/4 + 7)+2, int(width/2 + 10)+4, int(height/4 + 7)+2)
+      tb.setForegroundColor(fgWhite)
+      tb.write(int(width/2 - tempstr.len/2)+4, int(height/4 + 7)+2, tempstr)
+      tb.setForegroundColor(fgYellow)
+      tb.write(bb)
+      tb.display()
+      player.name = tempstr
     clearTerminal(0,0,terminalWidth(),terminalHeight())
 
 
@@ -410,10 +411,17 @@ proc exitProc() {.noconv.} =
     showCursor()
     quit(0)
 
+proc playMainTheme() {.thread.} =
+    let main_theme: string = "nimrod.mp3"
+    discard play(main_theme, 22000)
+
 proc main() =
     illwillInit(fullscreen=true)
     hideCursor()
-    player.name = displayTitleScreen()
+    var thread: array[2,Thread[void]]
+    createThread[void](thread[0], playMainTheme)
+    joinThreads(thread)
+    displayTitleScreen()
     drawInitialTerminal()
     setControlCHook(exitProc)
 
