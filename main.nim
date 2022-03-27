@@ -64,6 +64,7 @@ proc displayTitleScreen() =
     tb.write(int(width/2) - int("~Welcome to NimHack!~".len/2)+4, int(height/4 + 2)+2, "~Welcome to NimHack!~")
     tb.write(int(width/2) - int("What is your name?".len/2)+4, int(height/4 + 5)+2, "What is your name?")
     while not done:
+
       var 
           key = getKey()
           tempstr: string
