@@ -35,62 +35,61 @@ proc clearTerminal(x1,y1,x2,y2: int) = # Clears a rectangular area of the termin
 
 proc displayTitleScreen() =
     var n: int
-    {.cast(gcsafe).}:
-      tb.setForegroundColor(fgYellow)
-      var llen: int
-      for l in "title.txt".linesInFile:
-          tb.write(0,n,l)
-          inc n
-          llen = l.len
-      tb.drawRect(0,0,llen,7)
-      n += 1
-      for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
-        tb.setForegroundColor(color, isBright)
-        var nn = n
-        for l in "splash.txt".linesInFile:
-            tb.write(0,nn,l)
-            inc nn
-        tb.display()
-        sleep(0500)
-      sleep(1000)
+    tb.setForegroundColor(fgYellow)
+    var llen: int
+    for l in "title.txt".linesInFile:
+        tb.write(0,n,l)
+        inc n
+        llen = l.len
+    tb.drawRect(0,0,llen,7)
+    n += 1
+    for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
+      tb.setForegroundColor(color, isBright)
+      var nn = n
+      for l in "splash.txt".linesInFile:
+          tb.write(0,nn,l)
+          inc nn
+      tb.display()
+      sleep(0500)
+    sleep(1000)
     # THE SPAGHETTI CODE STARTS HERE; The code is a bit ugly so it needs to be cleaned up a little idk how
-      var
-        bb = newBoxBuffer(terminalWidth(), terminalHeight())
-        name: seq[char] 
-        done = false
+    var
+      bb = newBoxBuffer(terminalWidth(), terminalHeight())
+      name: seq[char] 
+      done = false
 
+    tb.setForegroundColor(fgYellow)
+    clearTerminal(int(width/4)+4,int(height/4)+2,int(width/4*3)+4,int(height/4*3)+2)
+    bb.drawRect(int(width/4)+4, int(height/4)+2, int(width/4*3)+4, int(height/4*3)+2, doubleStyle=true)
+    tb.write(int(width/2) - int("~Welcome to NimHack!~".len/2)+4, int(height/4 + 2)+2, "~Welcome to NimHack!~")
+    tb.write(int(width/2) - int("What is your name?".len/2)+4, int(height/4 + 5)+2, "What is your name?")
+    while not done:
+      var 
+          key = getKey()
+          tempstr: string
+      case key
+      of Key.Backspace: 
+        if name.len > 0:
+          discard name.pop()
+      of Key.Enter:
+        done = true
+      of Key.None:
+        discard
+      else:
+        if name.len <= 15:
+          name.add key.char
+    
+      for i in 0..<name.len:
+          tempstr.add $name[i]
+    
+      clearTerminal(int(width/2 - 10)+4, int(height/4 + 7)+2, int(width/2 + 10)+4, int(height/4 + 7)+2)
+      tb.setForegroundColor(fgWhite)
+      tb.write(int(width/2 - tempstr.len/2)+4, int(height/4 + 7)+2, tempstr)
       tb.setForegroundColor(fgYellow)
-      clearTerminal(int(width/4)+4,int(height/4)+2,int(width/4*3)+4,int(height/4*3)+2)
-      bb.drawRect(int(width/4)+4, int(height/4)+2, int(width/4*3)+4, int(height/4*3)+2, doubleStyle=true)
-      tb.write(int(width/2) - int("~Welcome to NimHack!~".len/2)+4, int(height/4 + 2)+2, "~Welcome to NimHack!~")
-      tb.write(int(width/2) - int("What is your name?".len/2)+4, int(height/4 + 5)+2, "What is your name?")
-      while not done:
-        var 
-            key = getKey()
-            tempstr: string
-        case key
-        of Key.Backspace: 
-          if name.len > 0:
-            discard name.pop()
-        of Key.Enter:
-            done = true
-        of Key.None:
-          discard
-        else:
-          if name.len <= 15:
-            name.add key.char
-    
-        for i in 0..<name.len:
-            tempstr.add $name[i]
-    
-        clearTerminal(int(width/2 - 10)+4, int(height/4 + 7)+2, int(width/2 + 10)+4, int(height/4 + 7)+2)
-        tb.setForegroundColor(fgWhite)
-        tb.write(int(width/2 - tempstr.len/2)+4, int(height/4 + 7)+2, tempstr)
-        tb.setForegroundColor(fgYellow)
-        tb.write(bb)
-        tb.display()
-        player.name = tempstr
-      clearTerminal(0,0,terminalWidth(),terminalHeight())
+      tb.write(bb)
+      tb.display()
+      player.name = tempstr
+    clearTerminal(0,0,terminalWidth(),terminalHeight())
 
 
 worldArr[0] = worldOriginal
