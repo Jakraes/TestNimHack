@@ -1,7 +1,7 @@
 import std/[os, math, times, strutils, random]
-import hacktypes, entities, generator
+import hacktypes, entities, generator, render
 from sound import play
-import illwill 
+import illwill, rexpaint
 #--------------------------------\\--------------------------------#
 
 const
@@ -13,9 +13,9 @@ const
 var 
     tb = newTerminalBuffer(terminalWidth(), terminalHeight())
     running = true
-    worldOriginal = loadWorldFile "shop.txt"
-    currentWorld = worldOriginal
-    world = worldOriginal
+    (worldOrig, worldOrigColors) = loadRexFile("rexmap.xp")
+    currentWorld = worldOrig
+    world = worldOrig
     player = Player(species: '@', att: 3, def: 3, acc: 10, hp: 10, mp: 10)
     playerMoved = false # Gotta add this because the player is attacking enemies without input, check dealCollision proc
     lastAction: string
@@ -35,23 +35,39 @@ proc clearTerminal(x1,y1,x2,y2: int) = # Clears a rectangular area of the termin
 
 proc displayTitleScreen() =
     var n: int
-    tb.setForegroundColor(fgYellow)
-    var llen: int
-    for l in "title.txt".linesInFile:
-        tb.write(0,n,l)
-        inc n
-        llen = l.len
-    tb.drawRect(0,0,llen,7)
+    let title = newRexpaintImage("title.xp")
+    for y in 0..<title.height:
+      for x in 0..<title.width:
+        setColor(tb, $title.get(0,x,y).fgColor)
+        tb.write(x,n, $title.get(0,x,y).code.char)
+      inc n
+#     for l in "title.txt".linesInFile:
+#         tb.write(0,n,l)
+#         inc n
+#         llen = l.len
+    tb.drawRect(0,0,64,7)
+    tb.display
+    sleep(100)
     n += 1
-    for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
-      tb.setForegroundColor(color, isBright)
+    # for (color, isBright) in [(fgBlack, false),(fgBlack, true),(fgRed, false)]:
+    #   tb.setForegroundColor(color, isBright)
+    #   var nn = n
+    #   for l in "splash.txt".linesInFile:
+    #       tb.write(0,nn,l)
+    #       inc nn
+    #   tb.display()
+    let splash = newRexpaintImage("splash.xp")
+    for z in 0..<splash.layers.len:
       var nn = n
-      for l in "splash.txt".linesInFile:
-          tb.write(0,nn,l)
-          inc nn
-      tb.display()
-      sleep(0500)
-    sleep(1000)
+      for y in 0..<splash.height:
+        for x in 0..<splash.width:
+          setColor(tb, $splash.get(z,x,y).fgColor)
+          tb.write(x,nn, $splash.get(0,x,y).code.char)
+        inc nn
+      tb.display
+      sleep(700)
+    sleep(2000)
+
     # THE SPAGHETTI CODE STARTS HERE; The code is a bit ugly so it needs to be cleaned up a little idk how
     var
       bb = newBoxBuffer(terminalWidth(), terminalHeight())
@@ -92,7 +108,7 @@ proc displayTitleScreen() =
     clearTerminal(0,0,terminalWidth(),terminalHeight())
 
 
-worldArr[0] = worldOriginal
+worldArr[0] = worldOrig
 for i in 1..15:  worldArr[i] = generateWorld() 
 player.inventory[0] = Items[1]
 player.inventory[1] = Items[2]
@@ -101,9 +117,9 @@ for i in 2..<7:
 player.spells[0] = "(D)ig"
 
 proc placeExit() =
-    let z = level
+    let w = level
     let (x,y) = chooseSpawn currentWorld
-    worldArr[z][y][x] = '>'
+    worldArr[w][y][x] = '>'
 
 proc placeEntities() =
     entitySeq = @[]
@@ -203,20 +219,19 @@ proc drawToTerminal() =
                 wX = camPos.x+tX-17
                 tile = world[wY][wX]
             var rtile:string # Replacement char
+            setColor(tb, worldOrigColors[wY][wX])
             case tile
             of 'S':
-                tb.setForegroundColor(fgRed, true)
+              tb.setForegroundColor(fgRed, true)
             of '@':
-              if player.pos == (wX, wY):
-                if player.hp > 0:
-                    tb.setForegroundColor(fgYellow, true)
-                else:
-                    tb.setForegroundColor(fgBlue, bright = true)
+              if player.hp > 0:
+                tb.setForegroundColor(fgYellow, true)
               else:
-                  tb.setForegroundColor(fgMagenta, true)
+                tb.setForegroundColor(fgBlue, bright = true)
             of '>':
-                tb.setForegroundColor(fgGreen, bright = true)
-            else:
+              tb.setForegroundColor(fgGreen, bright = true)
+            else: 
+              if level > 0:
                 tb.setForegroundColor(fgBlack, bright = true)
                 if (wX,wY,level) in goreSeq:
                   rtile = "•"
@@ -248,14 +263,13 @@ proc drawToTerminal() =
         else:
             discard
     tb.display()
-
-    sleep(50)
+    sleep(20)
 
 proc changeLevel(restart: bool = false) =
   # Changes the level. Restarts the level if used as
   # changeLevel(true) or changeLevel(restart = true)
     if restart or level == worldArr.len-1:
-        currentWorld = worldOriginal
+        currentWorld = worldOrig
         level = 0
     else:
         inc level
@@ -417,6 +431,7 @@ proc playMainTheme() {.thread.} =
 proc main() =
     illwillInit(fullscreen=true)
     hideCursor()
+    sleep(3000)
     var thread: array[2,Thread[void]]
     createThread[void](thread[0], playMainTheme)
     joinThreads(thread)

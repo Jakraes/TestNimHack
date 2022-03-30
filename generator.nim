@@ -1,6 +1,6 @@
 import std/random
-import math
-from hacktypes import linesInFile
+import math, rexpaint
+import hacktypes
 
 randomize()
 
@@ -9,27 +9,7 @@ const
     RoomSizeMin = 7
     RoomSizeMax = 13
     MaxDist = 30 # Max distance between rooms for corridors to be created
-    MapSize* = 50
 
-#[
-Future Idea:
-  Worlds have an enum or value
-  that determines what type of
-  world it is. Good for setting
-  up special procs that generate
-  special worlds. - Goat
-
-type
-    WorldType* = enum
-       Boss, Normal, Secret, Shop
-
-    World* = ref obj of RootObj
-        map*: array[MapSize, array[MapSize, char]]
-        type*: WorldType
-]#
-
-type World* = 
-    array[MapSize, array[MapSize, char]]
 var roomCoordinates: array[RoomAmount, tuple[y: int, x: int]]
 
 proc `^`(x, y: int): int = # Exponent function
@@ -41,19 +21,49 @@ proc distance (p1, p2: tuple[y: int, x: int]): float = # Calculates distance bet
     result = float(((p2.x-p1.x)^2 + (p2.y-p1.y)^2)).sqrt()
 
 proc initialWorld(): World =
-    for y in 0..<MapSize: # Fills the result array with the # character (wall)
-        for x in 0..<MapSize:
+  for y in 0..<MapSize: # Fills the result array with the # character (wall)
+    for x in 0..<MapSize:
             result[y][x] = '#'
 
 const initW = static(initialWorld())
 
-proc loadWorldFile*(file: static string): World =
-    result = initW # Fills void if the map is smaller than world size
-    var y = 0
-    for l in file.linesInFile:
-        for x in 0..<l.len-1:
-            result[y][x] = l[x]
-        inc y
+proc loadRexFile*(file: string): tuple[world:World, colormap:ColorMap] =
+  result.world = initW
+  var firstColorMap: array[MapSize,array[Mapsize, string]]
+  let image = newREXPaintImage(file)
+  let w:int = image.width
+  let h:int = image.height
+  # var l = image.layers
+  # echo l
+  # try:
+  #   for l in 0..<l.len:
+  #     for y in 0..<h:
+  #       for x in 0..<w:
+  #         let
+  #           cell = image.get(l, x, y)
+  #           tile = cell.code.char
+  #           fgcolor = $cell.fgColor
+  #         result.world.floor[l][y][x] = tile
+  #         result.colormap[l][y][x] = fgcolor
+  # except:
+  for y in 0..<h:
+    for x in 0..<w:
+      let
+        cell = image.get(0, x, y)
+        tile = cell.code.char
+        fgcolor = $cell.fgColor
+      result.world[y][x] = tile
+      firstColorMap[y][x] = fgcolor
+      result.colormap[y][x] = fgcolor
+
+
+# proc loadWorldFile*(file: static string): World =
+#     result = initW # Fills void if the map is smaller than world size
+#     var y = 0
+#     for l in file.linesInFile:
+#         for x in 0..<l.len-1:
+#             result[y][x] = l[x]
+#         inc y
 
 proc generate(): World =
     result = initW
@@ -143,9 +153,6 @@ proc generateWorld*(): World =
     var count = 0
     while count <= int((MapSize*MapSize)/3):
         count = 0
-        for y in 0..<MapSize:
-            for x in 0..<MapSize:
-                result[y][x] = '#' 
         result = generate()
         for y in 0..<MapSize:
             for x in 0..<MapSize: 
